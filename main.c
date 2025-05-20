@@ -3,7 +3,7 @@
 //
 // Main program to scan, parse, and execute nuPython programs.
 // 
-// << YOUR NAME >>
+// Aarya Patel
 // 
 // Starter code:
 //   Prof. Joe Hummel
@@ -19,6 +19,9 @@
 #include "token.h"    // token defs
 #include "scanner.h" 
 #include "parser.h"
+#include "programgraph.h"
+#include "ram.h"
+#include "execute.h"
 
 
 //
@@ -82,17 +85,22 @@ int main(int argc, char* argv[])
   else
   {
     printf("**parsing successful, valid syntax\n");
+    printf("**building program graph...\n");
+    struct STMT* program = programgraph_build(tokens);
+    programgraph_print(program);
+    printf("**executing...\n");
+    struct RAM* memory = ram_init();
 
-    //
-    // TODO:
-    //
+    execute(program, memory);
 
-
-
+    printf("**done\n");
+    ram_print(memory);
 
     //
     // cleanup:
     //
+    ram_destroy(memory);
+    programgraph_destroy(program);
     tokenqueue_destroy(tokens);
   }
 
