@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
   }
   else
   {
-    printf("**parsing successful, valid syntax\n");
+    printf("**no syntax errors...\n");
     printf("**building program graph...\n");
     struct STMT* program = programgraph_build(tokens);
     programgraph_print(program);
