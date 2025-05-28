@@ -126,6 +126,8 @@ static bool execute_real_operation(double lhs, double rhs, int operator_type, st
 // execute_string_operation
 //
 // Performs binary operations on two strings (only + for concatenation)
+// Manually allocates the necessary memory for the longer, new string
+// 
 //
 static bool execute_string_operation(char* lhs, char* rhs, int operator_type, struct RAM_VALUE* result, int line)
 {
@@ -178,7 +180,10 @@ static bool retrieve_value(struct ELEMENT* element, struct RAM* memory, struct R
     }
     else if (element->element_type == ELEMENT_STR_LITERAL) {
         result->value_type = RAM_TYPE_STR;
-        result->types.s = element->element_value;
+        int len = strlen(element->element_value);
+        char* str_copy = malloc(len + 1);
+        strcpy(str_copy, element->element_value);
+        result->types.s = str_copy;
         return true;
     }
     else if (element->element_type == ELEMENT_TRUE) {
@@ -199,9 +204,17 @@ static bool retrieve_value(struct ELEMENT* element, struct RAM* memory, struct R
             printf("**SEMANTIC ERROR: name '%s' is not defined (line %d)\n", var_name, line);
             return false;
         }
-        
-        // Copy the value
-        *result = *value;
+        if (value->value_type == RAM_TYPE_STR) {
+            result->value_type = RAM_TYPE_STR;
+            int len = strlen(value->types.s);
+            char* str_copy = malloc(len + 1);
+            strcpy(str_copy, value->types.s);
+            result->types.s = str_copy;
+        }
+        // Copy the pointer if not a string
+        else{
+            *result = *value;
+        }
         ram_free_value(value);
         return true;
     }
