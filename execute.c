@@ -70,6 +70,141 @@ static bool execute_input_function(struct FUNCTION_CALL* func_call, struct RAM_V
     return true;
 }
 
+//
+// execute_int_function
+//
+// Handles int() function calls - converts string variable to integer
+//
+static bool execute_int_function(struct FUNCTION_CALL* func_call, struct RAM* memory, struct RAM_VALUE* result, int line)
+{
+    struct ELEMENT* param = func_call->parameter;
+    
+    if (param == NULL || param->element_type != ELEMENT_IDENTIFIER) {
+        printf("**SEMANTIC ERROR: int() requires a variable (line %d)\n", line);
+        return false;
+    }
+    
+    // Get the variable value
+    char* var_name = param->element_value;
+    struct RAM_VALUE* var_value = ram_read_cell_by_name(memory, var_name);
+    
+    if (var_value == NULL) {
+        printf("**SEMANTIC ERROR: name '%s' is not defined (line %d)\n", var_name, line);
+        return false;
+    }
+    
+    if (var_value->value_type != RAM_TYPE_STR) {
+        printf("**SEMANTIC ERROR: int() requires a string (line %d)\n", line);
+        ram_free_value(var_value);
+        return false;
+    }
+    
+    // Convert string to integer
+    char* str_value = var_value->types.s;
+    int converted = atoi(str_value);
+    
+    // Check for conversion failure (special case for "0")
+    if (converted == 0 && strcmp(str_value, "0") != 0) {
+        // Check if it's all zeros
+        bool all_zeros = true;
+        for (int i = 0; str_value[i] != '\0'; i++) {
+            if (str_value[i] != '0') {
+                all_zeros = false;
+                break;
+            }
+        }
+        if (!all_zeros) {
+            printf("**SEMANTIC ERROR: invalid string for int() (line %d)\n", line);
+            ram_free_value(var_value);
+            return false;
+        }
+    }
+    
+    result->value_type = RAM_TYPE_INT;
+    result->types.i = converted;
+    ram_free_value(var_value);
+    return true;
+}
+
+//
+// execute_float_function
+//
+// Handles float() function calls - converts string variable to real
+//
+static bool execute_float_function(struct FUNCTION_CALL* func_call, struct RAM* memory, struct RAM_VALUE* result, int line)
+{
+    struct ELEMENT* param = func_call->parameter;
+    
+    if (param == NULL || param->element_type != ELEMENT_IDENTIFIER) {
+        printf("**SEMANTIC ERROR: float() requires a variable (line %d)\n", line);
+        return false;
+    }
+    
+    // Get the variable value
+    char* var_name = param->element_value;
+    struct RAM_VALUE* var_value = ram_read_cell_by_name(memory, var_name);
+    
+    if (var_value == NULL) {
+        printf("**SEMANTIC ERROR: name '%s' is not defined (line %d)\n", var_name, line);
+        return false;
+    }
+    
+    if (var_value->value_type != RAM_TYPE_STR) {
+        printf("**SEMANTIC ERROR: float() requires a string (line %d)\n", line);
+        ram_free_value(var_value);
+        return false;
+    }
+    
+    // Convert string to real
+    char* str_value = var_value->types.s;
+    double converted = atof(str_value);
+    
+    // Check for conversion failure (special case for "0")
+    if (converted == 0.0 && strcmp(str_value, "0") != 0 && strcmp(str_value, "0.0") != 0) {
+        // Check if it's all zeros (with possible decimal point)
+        bool all_zeros = true;
+        for (int i = 0; str_value[i] != '\0'; i++) {
+            if (str_value[i] != '0' && str_value[i] != '.') {
+                all_zeros = false;
+                break;
+            }
+        }
+        if (!all_zeros) {
+            printf("**SEMANTIC ERROR: invalid string for float() (line %d)\n", line);
+            ram_free_value(var_value);
+            return false;
+        }
+    }
+    
+    result->value_type = RAM_TYPE_REAL;
+    result->types.d = converted;
+    ram_free_value(var_value);
+    return true;
+}
+
+//
+// execute_assignment_function_call
+//
+// Main dispatcher for function calls in assignments
+//
+static bool execute_assignment_function_call(struct FUNCTION_CALL* func_call, struct RAM* memory, struct RAM_VALUE* result, int line)
+{
+    char* function_name = func_call->function_name;
+    
+    if (strcmp(function_name, "input") == 0) {
+        return execute_input_function(func_call, result, line);
+    }
+    else if (strcmp(function_name, "int") == 0) {
+        return execute_int_function(func_call, memory, result, line);
+    }
+    else if (strcmp(function_name, "float") == 0) {
+        return execute_float_function(func_call, memory, result, line);
+    }
+    else {
+        printf("**SEMANTIC ERROR: unknown function '%s' (line %d)\n", function_name, line);
+        return false;
+    }
+}
 
 
 //
@@ -596,11 +731,24 @@ static bool execute_assignment(struct STMT* stmt, struct RAM* memory)
     
     // Get the RHS value
     struct VALUE* rhs = stmt->types.assignment->rhs;
-    struct EXPR* expr = rhs->types.expr;
-    
-    // Use the extended binary expression handler for ALL cases
     struct RAM_VALUE result;
-    if (!execute_binary_expression(expr, memory, &result, stmt->line)) {
+
+    
+    // Check to see if the RHS value is assignment or function call
+    if (rhs->value_type == VALUE_FUNCTION_CALL){
+        if (!execute_assignment_function_call(rhs->types.function_call, memory, &result, stmt->line)){
+            return false;
+        }
+    }
+    else if (rhs->value_type == VALUE_EXPR){
+        struct EXPR* expr = rhs->types.expr;
+    // Use the extended binary expression handler for ALL cases
+        if (!execute_binary_expression(expr, memory, &result, stmt->line)) {
+            return false;
+        }
+    }
+    else{
+        printf("**SEMANTIC ERROR: unsupported assignment type (line %d)\n", stmt->line);
         return false;
     }
     
