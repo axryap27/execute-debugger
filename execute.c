@@ -31,6 +31,191 @@
 // Private functions
 //
 
+
+//
+// Helper functions for binary comparisons
+//
+
+//
+// execute_int_comparison
+//
+// Relational operators on two integers
+//
+static bool execute_int_comparison(int lhs, int rhs, int operator_type, struct RAM_VALUE* result, int line){
+    result->value_type = RAM_TYPE_BOOLEAN;
+
+    if (operator_type == OPERATOR_EQUAL){
+        if (lhs == rhs){
+            result->types.i = 1;
+        }
+        else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_NOT_EQUAL){
+        if (lhs != rhs){
+            result->types.i = 1;
+        }
+        else
+            result->types.i = 0;
+    }
+    // less than
+    else if (operator_type == OPERATOR_LT) {
+        if (lhs < rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    // less than or equal to
+    else if (operator_type == OPERATOR_LTE) {
+        if (lhs <= rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    // greater than
+    else if (operator_type == OPERATOR_GT) {
+        if (lhs > rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    // greater than or equal to
+    else if (operator_type == OPERATOR_GTE) {
+        if (lhs >= rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else {
+        return false; // Not a comparison operator
+    }
+    return true;
+}
+
+//
+// execute_real_comparison
+//
+// Performs relational operations on two reals
+//
+static bool execute_real_comparison(double lhs, double rhs, int operator_type, struct RAM_VALUE* result, int line)
+{
+    result->value_type = RAM_TYPE_BOOLEAN;
+    
+    if (operator_type == OPERATOR_EQUAL) {
+        if (lhs == rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_NOT_EQUAL) {
+        if (lhs != rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_LT) {
+        if (lhs < rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_LTE) {
+        if (lhs <= rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_GT) {
+        if (lhs > rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_GTE) {
+        if (lhs >= rhs) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else {
+        return false; // Not a comparison operator
+    }
+    return true;
+}
+
+
+//
+// execute_string_comparison
+//
+// Performs relational operations on two strings using strcmp
+//
+static bool execute_string_comparison(char* lhs, char* rhs, int operator_type, struct RAM_VALUE* result, int line)
+{
+    result->value_type = RAM_TYPE_BOOLEAN;
+    int cmp_result = strcmp(lhs, rhs);
+    
+    if (operator_type == OPERATOR_EQUAL) {
+        if (cmp_result == 0) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_NOT_EQUAL) {
+        if (cmp_result != 0) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_LT) {
+        if (cmp_result < 0) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_LTE) {
+        if (cmp_result <= 0) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_GT) {
+        if (cmp_result > 0) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else if (operator_type == OPERATOR_GTE) {
+        if (cmp_result >= 0) {
+            result->types.i = 1;
+        } else {
+            result->types.i = 0;
+        }
+    }
+    else {
+        return false; // Not a comparison operator
+    }
+    return true;
+}
+
+
+
+
 //
 // Helper functions for binary operations
 //
@@ -249,7 +434,37 @@ static bool execute_binary_expression(struct EXPR* expr, struct RAM* memory, str
     if (!retrieve_value(expr->rhs->element, memory, &rhs_value, line)) {
         return false;
     }
-    
+
+    if (expr->operator_type == OPERATOR_EQUAL || expr->operator_type == OPERATOR_NOT_EQUAL || expr->operator_type == OPERATOR_GT 
+    || expr->operator_type == OPERATOR_GTE || expr->operator_type == OPERATOR_LT || expr->operator_type == OPERATOR_LTE){
+        if (lhs_value.value_type == RAM_TYPE_INT && rhs_value.value_type == RAM_TYPE_INT){
+            return execute_int_comparison(lhs_value.types.i, rhs_value.types.i, expr->operator_type, result, line);
+        }
+        else if (lhs_value.value_type == RAM_TYPE_REAL && rhs_value.value_type == RAM_TYPE_REAL){
+            return execute_real_comparison(lhs_value.types.d, rhs_value.types.d, expr->operator_type, result, line);
+        }
+        else if ((lhs_value.value_type == RAM_TYPE_REAL && rhs_value.value_type == RAM_TYPE_INT)
+        || (lhs_value.value_type == RAM_TYPE_INT && rhs_value.value_type == RAM_TYPE_REAL)){
+            if (lhs_value.value_type == RAM_TYPE_INT){
+                double lhs_real = (double)lhs_value.types.i;
+                return execute_real_comparison(lhs_real, rhs_value.types.d, expr->operator_type, result, line);
+            }
+            else{
+                double rhs_real = (double)rhs_value.types.i;
+                return execute_real_comparison(lhs_value.types.d, rhs_real, expr->operator_type, result, line);
+            }
+        }
+        else if (lhs_value.value_type == RAM_TYPE_STR && rhs_value.value_type == RAM_TYPE_STR){
+            return execute_string_comparison(lhs_value.types.s, rhs_value.types.s, expr->operator_type, result, line);
+        }
+    }
+
+
+    else {
+        printf("**SEMANTIC ERROR: invalid operator types (line %d)\n", line);
+        return false;
+    }
+
     // Both operands are integers
     if (lhs_value.value_type == RAM_TYPE_INT && rhs_value.value_type == RAM_TYPE_INT) {
         return execute_int_operation(lhs_value.types.i, rhs_value.types.i, expr->operator_type, result, line);
