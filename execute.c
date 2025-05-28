@@ -634,12 +634,6 @@ static bool execute_binary_expression(struct EXPR* expr, struct RAM* memory, str
         }
     }
 
-
-    else {
-        printf("**SEMANTIC ERROR: invalid operator types (line %d)\n", line);
-        return false;
-    }
-
     // Both operands are integers
     if (lhs_value.value_type == RAM_TYPE_INT && rhs_value.value_type == RAM_TYPE_INT) {
         return execute_int_operation(lhs_value.types.i, rhs_value.types.i, expr->operator_type, result, line);
