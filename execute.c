@@ -31,6 +31,46 @@
 // Private functions
 //
 
+//
+// Input(), int(), floater() functions for assignment 
+//
+
+//
+// execute_input_function
+//
+// Handles input() function calls - prompts user and returns string
+// checks to see if the element type is a string literal, removed /0 at the end.
+//
+static bool execute_input_function(struct FUNCTION_CALL* func_call, struct RAM_VALUE* result, int line)
+{
+    struct ELEMENT* param = func_call->parameter;
+    
+    if (param == NULL || param->element_type != ELEMENT_STR_LITERAL) {
+        printf("**SEMANTIC ERROR: input() requires a string literal (line %d)\n", line);
+        return false;
+    }
+    
+    // Print the prompt
+    printf("%s", param->element_value);
+    
+    // Read user input
+    char line_input[256];
+    fgets(line_input, sizeof(line_input), stdin);
+    
+    // Remove EOL characters
+    line_input[strcspn(line_input, "\r\n")] = '\0';
+    
+    // Create a copy of the input string
+    int len = strlen(line_input);
+    char* input_copy = malloc(len + 1);
+    strcpy(input_copy, line_input);
+    
+    result->value_type = RAM_TYPE_STR;
+    result->types.s = input_copy;
+    return true;
+}
+
+
 
 //
 // Helper functions for binary comparisons
