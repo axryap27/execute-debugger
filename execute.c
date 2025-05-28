@@ -30,6 +30,127 @@
 // Private functions
 //
 
+//
+// Helper functions for binary operations
+//
+
+//
+// execute_int_operation
+//
+// Performs binary operations on two integers
+//
+static bool execute_int_operation(int lhs, int rhs, int operator_type, struct RAM_VALUE* result, int line)
+{
+    result->value_type = RAM_TYPE_INT;
+    
+    if (operator_type == OPERATOR_PLUS) {
+        result->types.i = lhs + rhs;
+    }
+    else if (operator_type == OPERATOR_MINUS) {
+        result->types.i = lhs - rhs;
+    }
+    else if (operator_type == OPERATOR_ASTERISK) {
+        result->types.i = lhs * rhs;
+    }
+    else if (operator_type == OPERATOR_POWER) {
+        result->types.i = 1;
+        for (int i = 0; i < rhs; i++) {
+            result->types.i *= lhs;
+        }
+    }
+    else if (operator_type == OPERATOR_MOD) {
+        if (rhs == 0) {
+            printf("**SEMANTIC ERROR: mod by 0 (line %d)\n", line);
+            return false;
+        }
+        result->types.i = lhs % rhs;
+    }
+    else if (operator_type == OPERATOR_DIV) {
+        if (rhs == 0) {
+            printf("**SEMANTIC ERROR: divide by 0 (line %d)\n", line);
+            return false;
+        }
+        result->types.i = lhs / rhs;
+    }
+    else {
+        printf("**SEMANTIC ERROR: invalid operand types (line %d)\n", line);
+        return false;
+    }
+    return true;
+}
+
+//
+// execute_real_operation  
+//
+// Performs binary operations on two reals
+//
+static bool execute_real_operation(double lhs, double rhs, int operator_type, struct RAM_VALUE* result, int line)
+{
+    result->value_type = RAM_TYPE_REAL;
+    
+    if (operator_type == OPERATOR_PLUS) {
+        result->types.d = lhs + rhs;
+    }
+    else if (operator_type == OPERATOR_MINUS) {
+        result->types.d = lhs - rhs;
+    }
+    else if (operator_type == OPERATOR_ASTERISK) {
+        result->types.d = lhs * rhs;
+    }
+    else if (operator_type == OPERATOR_POWER) {
+        result->types.d = pow(lhs, rhs);
+    }
+    else if (operator_type == OPERATOR_MOD) {
+        if (rhs == 0.0) {
+            printf("**SEMANTIC ERROR: mod by 0 (line %d)\n", line);
+            return false;
+        }
+        result->types.d = fmod(lhs, rhs);
+    }
+    else if (operator_type == OPERATOR_DIV) {
+        if (rhs == 0.0) {
+            printf("**SEMANTIC ERROR: divide by 0 (line %d)\n", line);
+            return false;
+        }
+        result->types.d = lhs / rhs;
+    }
+    else {
+        printf("**SEMANTIC ERROR: invalid operand types (line %d)\n", line);
+        return false;
+    }
+    return true;
+}
+
+//
+// execute_string_operation
+//
+// Performs binary operations on two strings (only + for concatenation)
+//
+static bool execute_string_operation(char* lhs, char* rhs, int operator_type, struct RAM_VALUE* result, int line)
+{
+    if (operator_type != OPERATOR_PLUS) {
+        printf("**SEMANTIC ERROR: invalid operand types (line %d)\n", line);
+        return false;
+    }
+    
+    // String concatenation
+    int len1 = strlen(lhs);
+    int len2 = strlen(rhs);
+    char* concatenated = malloc(len1 + len2 + 1);
+    
+    if (concatenated == NULL) {
+        printf("**SEMANTIC ERROR: memory allocation failed (line %d)\n", line);
+        return false;
+    }
+    
+    strcpy(concatenated, lhs);
+    strcat(concatenated, rhs);
+    
+    result->value_type = RAM_TYPE_STR;
+    result->types.s = concatenated;
+    return true;
+}
+
 
 //
 // write_value_to_variable
