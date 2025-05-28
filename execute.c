@@ -20,6 +20,7 @@
 #include <stdbool.h>  // true, false
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 #include "programgraph.h"
 #include "ram.h"
@@ -151,6 +152,119 @@ static bool execute_string_operation(char* lhs, char* rhs, int operator_type, st
     return true;
 }
 
+//
+// retrieve_value
+//
+// Given an element (integer literal or variable) and
+// memory, retrieves the integer value and stores it
+// in the result pointer. Used as a helper for binary
+// expression evaluation. If a semantic error occurs
+// (e.g. undefined variable, non-integer type), an 
+// error message is output and the function returns false.
+// Enhanced version that can retrieve any type of value (int, real, string, boolean)
+//
+
+static bool retrieve_value(struct ELEMENT* element, struct RAM* memory, struct RAM_VALUE* result, int line)
+{
+    if (element->element_type == ELEMENT_INT_LITERAL) {
+        result->value_type = RAM_TYPE_INT;
+        result->types.i = atoi(element->element_value);
+        return true;
+    } 
+    else if (element->element_type == ELEMENT_REAL_LITERAL) {
+        result->value_type = RAM_TYPE_REAL;
+        result->types.d = atof(element->element_value);
+        return true;
+    }
+    else if (element->element_type == ELEMENT_STR_LITERAL) {
+        result->value_type = RAM_TYPE_STR;
+        result->types.s = element->element_value;
+        return true;
+    }
+    else if (element->element_type == ELEMENT_TRUE) {
+        result->value_type = RAM_TYPE_BOOLEAN;
+        result->types.i = 1;
+        return true;
+    }
+    else if (element->element_type == ELEMENT_FALSE) {
+        result->value_type = RAM_TYPE_BOOLEAN;
+        result->types.i = 0;
+        return true;
+    }
+    else if (element->element_type == ELEMENT_IDENTIFIER) {
+        char* var_name = element->element_value;
+        struct RAM_VALUE* value = ram_read_cell_by_name(memory, var_name);
+        
+        if (value == NULL) {
+            printf("**SEMANTIC ERROR: name '%s' is not defined (line %d)\n", var_name, line);
+            return false;
+        }
+        
+        // Copy the value
+        *result = *value;
+        ram_free_value(value);
+        return true;
+    }
+    
+    printf("**SEMANTIC ERROR: unsupported element type in expression (line %d)\n", line);
+    return false;
+}
+
+//
+// execute_binary_expression
+//
+// Given a binary expression, memory, and result pointer,
+// evaluates the expression and stores the integer result.
+// Supports +, -, *, /, %, ** operators with integer 
+// literals and variables as operands. If a semantic 
+// error occurs (e.g. undefined variable, divide by 0),
+// an error message is output, execution stops, and 
+// the function returns false.
+// Extended to operate on reals, ints, and strings
+//
+static bool execute_binary_expression(struct EXPR* expr, struct RAM* memory, struct RAM_VALUE* result, int line)
+{
+    if (!expr->isBinaryExpr) {
+        return retrieve_value(expr->lhs->element, memory, result, line);
+    }
+    
+    struct RAM_VALUE lhs_value, rhs_value;
+    
+    if (!retrieve_value(expr->lhs->element, memory, &lhs_value, line)) {
+        return false;
+    }
+    if (!retrieve_value(expr->rhs->element, memory, &rhs_value, line)) {
+        return false;
+    }
+    
+    // Both operands are integers
+    if (lhs_value.value_type == RAM_TYPE_INT && rhs_value.value_type == RAM_TYPE_INT) {
+        return execute_int_operation(lhs_value.types.i, rhs_value.types.i, expr->operator_type, result, line);
+    }
+    // Both operands are reals
+    else if (lhs_value.value_type == RAM_TYPE_REAL && rhs_value.value_type == RAM_TYPE_REAL) {
+        return execute_real_operation(lhs_value.types.d, rhs_value.types.d, expr->operator_type, result, line);
+    }
+    // One int, one real - convert to reals
+    else if ((lhs_value.value_type == RAM_TYPE_INT && rhs_value.value_type == RAM_TYPE_REAL) ||
+             (lhs_value.value_type == RAM_TYPE_REAL && rhs_value.value_type == RAM_TYPE_INT)) {
+        double lhs_real = (lhs_value.value_type == RAM_TYPE_INT) ? (double)lhs_value.types.i : lhs_value.types.d;
+        double rhs_real = (rhs_value.value_type == RAM_TYPE_INT) ? (double)rhs_value.types.i : rhs_value.types.d;
+        return execute_real_operation(lhs_real, rhs_real, expr->operator_type, result, line);
+    }
+    // Both operands are strings
+    else if (lhs_value.value_type == RAM_TYPE_STR && rhs_value.value_type == RAM_TYPE_STR) {
+        return execute_string_operation(lhs_value.types.s, rhs_value.types.s, expr->operator_type, result, line);
+    }
+    // Invalid combination
+    else {
+        printf("**SEMANTIC ERROR: invalid operand types (line %d)\n", line);
+        return false;
+    }
+}
+
+
+
 
 //
 // write_value_to_variable
@@ -193,110 +307,6 @@ static bool write_value_to_variable(char* var_name, bool isPtrDeref, struct RAM_
     return true;
 }
 
-//
-// retrieve_value
-//
-// Given an element (integer literal or variable) and
-// memory, retrieves the integer value and stores it
-// in the result pointer. Used as a helper for binary
-// expression evaluation. If a semantic error occurs
-// (e.g. undefined variable, non-integer type), an 
-// error message is output and the function returns false.
-//
-static bool retrieve_value(struct ELEMENT* element, struct RAM* memory, int* result, int line)
-{
-    if (element->element_type == ELEMENT_INT_LITERAL) {
-        *result = atoi(element->element_value);
-        return true;
-    } 
-    else if (element->element_type == ELEMENT_IDENTIFIER) {
-        char* var_name = element->element_value;
-        struct RAM_VALUE* value = ram_read_cell_by_name(memory, var_name);
-        
-        // Check if the variable exists
-        if (value == NULL) {
-            printf("**SEMANTIC ERROR: name '%s' is not defined (line %d)\n", 
-                   var_name, line);
-            return false;
-        }
-        // Check if the variable contains an integer
-        if (value->value_type != RAM_TYPE_INT) {
-            printf("**SEMANTIC ERROR: variable '%s' must be an integer (line %d)\n", 
-                   var_name, line);
-            ram_free_value(value);  // Free the allocated memory
-            return false;
-        }
-        *result = value->types.i;
-        ram_free_value(value);  // Free the allocated memory
-        return true;
-    }
-    
-    printf("**SEMANTIC ERROR: unsupported element type in expression (line %d)\n", line);
-    return false;
-}
-
-//
-// execute_binary_expression
-//
-// Given a binary expression, memory, and result pointer,
-// evaluates the expression and stores the integer result.
-// Supports +, -, *, /, %, ** operators with integer 
-// literals and variables as operands. If a semantic 
-// error occurs (e.g. undefined variable, divide by 0),
-// an error message is output, execution stops, and 
-// the function returns false.
-//
-static bool execute_binary_expression(struct EXPR* expr, struct RAM* memory, int* result, int line)
-{
-    if (!expr->isBinaryExpr) {
-        return retrieve_value(expr->lhs->element, memory, result, line);
-    }
-    //left and right side values
-    int lhs_value;
-    if (!retrieve_value(expr->lhs->element, memory, &lhs_value, line)) {
-        return false;
-    }
-    int rhs_value;
-    if (!retrieve_value(expr->rhs->element, memory, &rhs_value, line)) {
-        return false;
-    }
-    
-    if (expr->operator_type == OPERATOR_PLUS) {
-        *result = lhs_value + rhs_value;
-    }
-    else if (expr->operator_type == OPERATOR_MINUS) {
-        *result = lhs_value - rhs_value;
-    }
-    else if (expr->operator_type == OPERATOR_ASTERISK) {
-        *result = lhs_value * rhs_value;
-    }
-    else if (expr->operator_type == OPERATOR_POWER) {
-        *result = 1;
-        for (int i = 0; i < rhs_value; i++) {
-            *result *= lhs_value;
-        }
-    }
-    else if (expr->operator_type == OPERATOR_MOD) {
-        if (rhs_value == 0) {
-            printf("**SEMANTIC ERROR: mod by 0 (line %d)\n", line);
-            return false;
-        }
-        *result = lhs_value % rhs_value;
-    }
-    else if (expr->operator_type == OPERATOR_DIV) {
-        if (rhs_value == 0) {
-            printf("**SEMANTIC ERROR: divide by 0 (line %d)\n", line);
-            return false;
-        }
-        *result = lhs_value / rhs_value;
-    }
-    else {
-        printf("**SEMANTIC ERROR: unsupported operator (line %d)\n", line);
-        return false;
-    }
-    
-    return true;
-}
 
 //
 // execute_assignment
@@ -309,7 +319,6 @@ static bool execute_binary_expression(struct EXPR* expr, struct RAM* memory, int
 // occurs (e.g. undefined variable), an error message
 // is output and the function returns false.
 //
-
 static bool execute_assignment(struct STMT* stmt, struct RAM* memory)
 {
     assert(stmt->stmt_type == STMT_ASSIGNMENT);
@@ -321,71 +330,14 @@ static bool execute_assignment(struct STMT* stmt, struct RAM* memory)
     struct VALUE* rhs = stmt->types.assignment->rhs;
     struct EXPR* expr = rhs->types.expr;
     
-    // Check if it's a binary expression
-    if (expr->isBinaryExpr) {
-        int result;
-        if (!execute_binary_expression(expr, memory, &result, stmt->line)) {
-            return false;
-        }
-        
-        struct RAM_VALUE ram_value;
-        ram_value.value_type = RAM_TYPE_INT;
-        ram_value.types.i = result;
-        
-        return write_value_to_variable(var_name, isPtrDeref, ram_value, memory, stmt->line);
-    }
-    else {
-        // Simple assignment
-        struct UNARY_EXPR* unary_expr = expr->lhs;
-        struct ELEMENT* element = unary_expr->element;
-
-        if (element->element_type == ELEMENT_IDENTIFIER) {
-            // Case: variable1 = variable2
-            char* rhs_var_name = element->element_value;
-            
-            struct RAM_VALUE* rhs_value = ram_read_cell_by_name(memory, rhs_var_name);
-            if (rhs_value == NULL) {
-                printf("**SEMANTIC ERROR: name '%s' is not defined (line %d)\n", 
-                       rhs_var_name, stmt->line);
-                return false;
-            }
-
-            bool success = write_value_to_variable(var_name, isPtrDeref, *rhs_value, memory, stmt->line);
-            ram_free_value(rhs_value);
-            return success;
-        }
-        // int
-        else if (element->element_type == ELEMENT_INT_LITERAL) {
-            int value = atoi(element->element_value);
-            struct RAM_VALUE ram_value;
-            ram_value.value_type = RAM_TYPE_INT;
-            ram_value.types.i = value;
-            
-            return write_value_to_variable(var_name, isPtrDeref, ram_value, memory, stmt->line);
-        }
-        // double
-        else if (element->element_type == ELEMENT_REAL_LITERAL) {
-            double value = atof(element->element_value);
-            struct RAM_VALUE ram_value;
-            ram_value.value_type = RAM_TYPE_REAL;
-            ram_value.types.d = value;
-            
-            return write_value_to_variable(var_name, isPtrDeref, ram_value, memory, stmt->line);
-        }
-        // string literal
-        else if (element->element_type == ELEMENT_STR_LITERAL) {
-            struct RAM_VALUE ram_value;
-            ram_value.value_type = RAM_TYPE_STR;
-            ram_value.types.s = element->element_value;
-            
-            return write_value_to_variable(var_name, isPtrDeref, ram_value, memory, stmt->line);
-        }
+    // Use the extended binary expression handler for ALL cases
+    struct RAM_VALUE result;
+    if (!execute_binary_expression(expr, memory, &result, stmt->line)) {
+        return false;
     }
     
-    return false;
+    return write_value_to_variable(var_name, isPtrDeref, result, memory, stmt->line);
 }
-    
-
 //
 // execute_function_call
 //
@@ -425,7 +377,15 @@ static bool execute_function_call(struct STMT* stmt, struct RAM* memory)
             double param_real = atof(param->element_value);
             printf("%lf\n", param_real);
             return true;
+        }
+        else if (param->element_type == ELEMENT_FALSE){
+            printf("False\n");
+            return true;
         }        
+        else if (param->element_type == ELEMENT_TRUE){
+            printf("True\n");
+            return true;
+        }
         else if (param->element_type == ELEMENT_IDENTIFIER){
             char* var_name = param->element_value;
             struct RAM_VALUE* value = ram_read_cell_by_name(memory, var_name);
@@ -443,6 +403,14 @@ static bool execute_function_call(struct STMT* stmt, struct RAM* memory)
             }
             else if (value->value_type == RAM_TYPE_STR) {
                 printf("%s\n", value->types.s);
+            }
+            else if (value->value_type == RAM_TYPE_BOOLEAN){
+                if (value->types.i == 0){
+                    printf("False\n");
+                }
+                else{
+                    printf("True\n");
+                }
             }
             return true;
         }
