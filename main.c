@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
     printf("**parsing successful, valid syntax\n");
     printf("**building program graph...\n");
     struct STMT* program = programgraph_build(tokens);
-    programgraph_print(program);
+    //programgraph_print(program);
     printf("**executing...\n");
     struct RAM* memory = ram_init();
 
