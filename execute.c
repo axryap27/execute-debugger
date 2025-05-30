@@ -5,7 +5,9 @@
 // the execute() function and helper functions that interpret
 // and execute nuPython statements from a program graph and allocated RAM memory.
 // Supports assignment statements, function calls (print),
-// binary expressions, and pointer operations.
+// binary expressions, int(), float(), input() function calls
+// if-then-else statements, and while loops. Extends last version
+// by allowing for reals, ints, and string operations of binary expressions.
 //
 // Aarya Patel
 // Northwestern University
@@ -37,8 +39,13 @@
 //
 // execute_input_function
 //
-// Handles input() function calls - prompts user and returns string
-// checks to see if the element type is a string literal, removed /0 at the end.
+// Handles the input() function call by prompting the user with
+// a string literal and reading their input from stdin. The function
+// expects a string literal parameter as the prompt, reads a complete
+// line of user input, removes end-of-line characters, and returns
+// the input as a dynamically allocated string. If a semantic error
+// occurs (e.g. missing parameter, non-string parameter), an error
+// message is output and the function returns false.
 //
 static bool execute_input_function(struct FUNCTION_CALL *func_call, struct RAM_VALUE *result, int line)
 {
@@ -73,7 +80,15 @@ static bool execute_input_function(struct FUNCTION_CALL *func_call, struct RAM_V
 //
 // execute_int_function
 //
-// Handles int() function calls - converts string variable to integer
+// Handles the int() function call by converting a string variable
+// to an integer value. The function expects a variable parameter
+// containing a string value, retrieves the string from memory,
+// and converts it to an integer using atoi(). Handles the special
+// case where "0" or strings of all zeros are valid conversions
+// that return 0. If a semantic error occurs (e.g. missing parameter,
+// non-variable parameter, undefined variable, non-string variable,
+// or invalid string conversion), an error message is output and
+// the function returns false.
 //
 static bool execute_int_function(struct FUNCTION_CALL *func_call, struct RAM *memory, struct RAM_VALUE *result, int line)
 {
@@ -136,7 +151,15 @@ static bool execute_int_function(struct FUNCTION_CALL *func_call, struct RAM *me
 //
 // execute_float_function
 //
-// Handles float() function calls - converts string variable to real
+// Handles the float() function call by converting a string variable
+// to a real (double) value. The function expects a variable parameter
+// containing a string value, retrieves the string from memory,
+// and converts it to a real using atof(). Handles the special
+// case where "0", "0.0", or strings of all zeros with optional
+// decimal points are valid conversions that return 0.0. If a semantic
+// error occurs (e.g. missing parameter, non-variable parameter,
+// undefined variable, non-string variable, or invalid string
+// conversion), an error message is output and the function returns false.
 //
 static bool execute_float_function(struct FUNCTION_CALL *func_call, struct RAM *memory, struct RAM_VALUE *result, int line)
 {
@@ -199,7 +222,14 @@ static bool execute_float_function(struct FUNCTION_CALL *func_call, struct RAM *
 //
 // execute_assignment_function_call
 //
-// Main dispatcher for function calls in assignments
+// Main dispatcher function for handling function calls that appear
+// on the right-hand side of assignment statements. Identifies the
+// function by name and delegates execution to the appropriate
+// specialized handler: execute_input_function for input() calls,
+// execute_int_function for int() calls, and execute_float_function
+// for float() calls. If a semantic error occurs (e.g. unknown
+// function name), an error message is output and the function
+// returns false.
 //
 static bool execute_assignment_function_call(struct FUNCTION_CALL *func_call, struct RAM *memory, struct RAM_VALUE *result, int line)
 {
@@ -224,14 +254,23 @@ static bool execute_assignment_function_call(struct FUNCTION_CALL *func_call, st
     }
 }
 
+
+//
 //
 // Helper functions for binary comparisons
+//
 //
 
 //
 // execute_int_comparison
 //
-// Relational operators on two integers
+// Performs relational comparison operations on two integer values
+// and returns a boolean result. Supports all comparison operators:
+// equality (==), inequality (!=), less than (<), less than or equal (<=),
+// greater than (>), and greater than or equal (>=). The result is
+// stored as a RAM_TYPE_BOOLEAN with integer value 1 for True and 0
+// for False. If an unsupported operator type is provided, the function
+// returns false to indicate an error.
 //
 static bool execute_int_comparison(int lhs, int rhs, int operator_type, struct RAM_VALUE *result, int line)
 {
@@ -315,7 +354,13 @@ static bool execute_int_comparison(int lhs, int rhs, int operator_type, struct R
 //
 // execute_real_comparison
 //
-// Performs relational operations on two reals
+// Performs relational comparison operations on two real (double) values
+// and returns a boolean result. Supports all comparison operators:
+// equality (==), inequality (!=), less than (<), less than or equal (<=),
+// greater than (>), and greater than or equal (>=). The result is
+// stored as a RAM_TYPE_BOOLEAN with integer value 1 for True and 0
+// for False. If an unsupported operator type is provided, the function
+// returns false to indicate an error.
 //
 static bool execute_real_comparison(double lhs, double rhs, int operator_type, struct RAM_VALUE *result, int line)
 {
@@ -397,7 +442,14 @@ static bool execute_real_comparison(double lhs, double rhs, int operator_type, s
 //
 // execute_string_comparison
 //
-// Performs relational operations on two strings using strcmp
+// Performs relational comparison operations on two string values
+// using case-sensitive string comparison and returns a boolean result.
+// Uses strcmp() to compare strings lexicographically and supports all
+// comparison operators: equality (==), inequality (!=), less than (<),
+// less than or equal (<=), greater than (>), and greater than or equal (>=).
+// The result is stored as a RAM_TYPE_BOOLEAN with integer value 1 for
+// True and 0 for False. If an unsupported operator type is provided,
+// the function returns false to indicate an error.
 //
 static bool execute_string_comparison(char *lhs, char *rhs, int operator_type, struct RAM_VALUE *result, int line)
 {
@@ -481,10 +533,17 @@ static bool execute_string_comparison(char *lhs, char *rhs, int operator_type, s
 // Helper functions for binary operations
 //
 
+
 //
 // execute_int_operation
 //
-// Performs binary operations on two integers
+// Performs arithmetic operations on two integers (ints). Handles
+// addition (+), subtraction (-), multiplication (*), exponentiation (**),
+// modulo (%), and division (/). Uses pow() from math.h for exponentiation
+// and fmod() for modulo operations since the standard % operator doesn't
+// work with floating point values. Includes error checking for division
+// and modulo by zero. Returns false if a division by zero occurs or an
+// unsupported operator is encountered.
 //
 static bool execute_int_operation(int lhs, int rhs, int operator_type, struct RAM_VALUE *result, int line)
 {
@@ -539,7 +598,13 @@ static bool execute_int_operation(int lhs, int rhs, int operator_type, struct RA
 //
 // execute_real_operation
 //
-// Performs binary operations on two reals
+// Performs arithmetic operations on two real numbers (doubles). Handles
+// addition (+), subtraction (-), multiplication (*), exponentiation (**),
+// modulo (%), and division (/). Uses pow() from math.h for exponentiation
+// and fmod() for modulo operations since the standard % operator doesn't
+// work with floating point values. Includes error checking for division
+// and modulo by zero. Returns false if a division by zero occurs or an
+// unsupported operator is encountered.
 //
 static bool execute_real_operation(double lhs, double rhs, int operator_type, struct RAM_VALUE *result, int line)
 {
@@ -590,9 +655,12 @@ static bool execute_real_operation(double lhs, double rhs, int operator_type, st
 //
 // execute_string_operation
 //
-// Performs binary operations on two strings (only + for concatenation)
-// Manually allocates the necessary memory for the longer, new string
-//
+// Performs operations on two strings. Currently only supports concatenation
+// using the + operator - all other operators result in a semantic error.
+// Dynamically allocates memory for the concatenated result, copies the first
+// string, then appends the second string. Includes error checking for memory
+// allocation failure. Returns false if an unsupported operator is used or
+// memory allocation fails.
 //
 static bool execute_string_operation(char *lhs, char *rhs, int operator_type, struct RAM_VALUE *result, int line)
 {
@@ -703,12 +771,10 @@ static bool retrieve_value(struct ELEMENT *element, struct RAM *memory, struct R
 // execute_binary_expression
 //
 // Given a binary expression, memory, and result pointer,
-// evaluates the expression and stores the integer result.
-// Supports +, -, *, /, %, ** operators with integer
-// literals and variables as operands. If a semantic
-// error occurs (e.g. undefined variable, divide by 0),
-// an error message is output, execution stops, and
-// the function returns false.
+// evaluates the expression and stores the integer result. Supports +, -, *, /, %, ** 
+// operators with integer literals and variables as operands. 
+// If a semantic error occurs (e.g. undefined variable, divide by 0),
+// an error message is output, execution stops, and the function returns false.
 // Extended to operate on reals, ints, and strings
 //
 static bool execute_binary_expression(struct EXPR *expr, struct RAM *memory, struct RAM_VALUE *result, int line)
@@ -790,10 +856,15 @@ static bool execute_binary_expression(struct EXPR *expr, struct RAM *memory, str
 }
 
 //
-// execute_expr()
+// execute_expr
 //
-// Helper function that given a conditional executes the expression
-// to determine the result of the condition.
+// Evaluates any expression and returns the result. Handles both simple
+// expressions (single values like variables or literals) and complex
+// binary expressions (with operators). Allocates memory for the result
+// and delegates the actual work to either execute_binary_expression or
+// retrieve_value depending on the expression type. Cleans up allocated
+// memory if an error occurs during evaluation. Returns NULL if memory
+// allocation fails or expression evaluation encounters an error.
 //
 static struct RAM_VALUE *execute_expr(struct STMT *stmt, struct RAM *memory, struct EXPR *expr)
 {
@@ -824,12 +895,14 @@ static struct RAM_VALUE *execute_expr(struct STMT *stmt, struct RAM *memory, str
 //
 // execute_if_stmt
 //
-// Handles stmts that are if-then-else types by
-// checking for the condition in the expression struct
-// and evaluating the condition with the execute_expr helper function.
-// Based on the condition result, the next stmt pointer is assigned to true or false path.
-// Error checking also included for if result is NULL
-
+// Handles if/elif/else statements by evaluating the condition and
+// determining which path to follow next. Uses execute_expr to evaluate
+// the condition, then interprets the result as a boolean (0 = false,
+// non-zero = true). Sets the next statement pointer to either the true
+// path or false path based on the condition result. Only accepts integer
+// or boolean condition results - other types result in a semantic error.
+// Returns false if condition evaluation fails or produces an invalid type.
+//
 static bool execute_if_stmt(struct STMT *stmt, struct RAM *memory, struct STMT **next_stmt)
 {
     assert(stmt->stmt_type == STMT_IF_THEN_ELSE);
@@ -866,15 +939,18 @@ static bool execute_if_stmt(struct STMT *stmt, struct RAM *memory, struct STMT *
     return true;
 }
 
+
 //
 // execute_while_loop
 //
-// Handles stmts that are while loop types by
-// checking for the condition in the expression struct
-// and evaluating the condition with the execute_expr helper function.
-// Based on the condition result, the next stmt pointer is assigned to either next path or loop body.
-// Error checking also included for if result pointer is NULL.
-
+// Handles while loop statements by evaluating the loop condition and
+// determining whether to enter the loop body or exit the loop. Uses
+// execute_expr to evaluate the condition, then interprets the result
+// as a boolean (0 = false, non-zero = true). If the condition is true,
+// sets next statement to the loop body; if false, sets it to the statement
+// after the loop. Only accepts integer or boolean condition results.
+// Returns false if condition evaluation fails or produces an invalid type.
+//
 static bool execute_while_loop(struct STMT *stmt, struct RAM *memory, struct STMT **next_stmt)
 {
     assert(stmt->stmt_type == STMT_WHILE_LOOP);
